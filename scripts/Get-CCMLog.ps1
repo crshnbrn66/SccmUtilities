@@ -1,33 +1,42 @@
-##############################
-#.SYNOPSIS
-# parses SCCM logs from a machine into an object
-#
-#.DESCRIPTION
-# Creates a parsed object for the log passed via the computername and path Parameters.
-#
-#.Parameter ComputerName
-#Computer name to retrieve the logs from
-#
-#.Parameter path
-#Path on the computer where the logs reside.. Normally found in C:\windows\ccm\logs
-#
-#.Parameter log
-#Dynamic Parameter that contains the logs found in the \\computername\path. 
-# this dynamic Parameter is the name of all the files with the Extension of .log
-#.EXAMPLE
-#get-ccmlog -computername localhost -path c:\windows\ccm\logs -log [dynamic list of available logs]
-#
-#.NOTES
-#This function is best used when running from the command line for troubleshooting reasons. If you include in, inline code you may get un-expected errors because of the way variables are parsed.  If you wish to use this in in line code than use the function called get-ccmspecificlog
-#This function depends on Get-cmlog function.
-#The return results for this function is an object with a prepended value of Log
-#C:\>.\get-ccmlog -ComputerName localhost -path c:\ccm\logs -Log AlternateHandler
-#
-#    AlternateHandlerLog
-#    {@{UTCTime=4/16/2018 8:01:35 AM; LocalTime=4/16/2018 1:01:35 PM; FileName=AlternateHandler.log; Component=AlternateHandler; Context=; Type=1; TID=; Reference=calternatehandler.cpp:470; Messag...
-#
-#
-##############################
+<#
+.SYNOPSIS
+Parses logs for System Center Configuration Manager.
+.DESCRIPTION
+Accepts a single log file or array of log files and parses them into objects.  Shows both UTC and local time for troubleshooting across time zones.
+.ParameterETER Path
+Specifies the path to a log file or files.
+.INPUTS
+Path/FullName.  
+.OUTPUTS
+PSCustomObject.  
+.EXAMPLE
+C:\PS> Get-CMLog -Path Sample.log
+Converts each log line in Sample.log into objects
+UTCTime   : 7/15/2013 3:28:08 PM
+LocalTime : 7/15/2013 2:28:08 PM
+FileName  : sample.log
+Component : TSPxe
+Context   : 
+Type      : 3
+TID       : 1040
+Reference : libsmsmessaging.cpp:9281
+Message   : content location request failed
+.EXAMPLE
+C:\PS> Get-ChildItem -Path C:\Windows\CCM\Logs | Select-String -Pattern 'failed' | Select -Unique Path | Get-CMLog
+Find all log files in folder, create a unique list of files containing the phrase 'failed, and convert the logs into objects
+UTCTime   : 7/15/2013 3:28:08 PM
+LocalTime : 7/15/2013 2:28:08 PM
+FileName  : sample.log
+Component : TSPxe
+Context   : 
+Type      : 3
+TID       : 1040
+Reference : libsmsmessaging.cpp:9281
+Message   : content location request failed
+.LINK
+http://blog.richprescott.com
+#>
+
 function Get-CCMLog 
 {
 
