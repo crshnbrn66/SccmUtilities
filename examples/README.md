@@ -8,4 +8,4 @@ These scripts show how to use the SCCM utilities function to allow for calling a
 - CopySMSclient.ps1 - 
   Copying the Sms client to destination using the system to be installed on to do the copy.
 - callTaskSequence.ps1 - 
-  Calls a task sequence that will patch a machien with the appropriate patches for a collection
+  Calls a task sequence that will patch a machine with the appropriate patches for a collection
