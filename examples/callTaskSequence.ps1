@@ -1,10 +1,15 @@
-﻿param($computerName = 'dc01', $collectionName ='UPDATE NOW - Servers', $SiteServer = 'cm02.corp.cmlab.com', $AdvertisementID='', $Schedule = '',$siteCode = 'TP1' , $username, $password, $logfile = "$(Get-Date -Format 'yyyyMMddHHmmss')")
+#$schedule = <TASKSEQUENCEDEPLOYMENTID-TASKSEQUENCEPACKAGEID-6F6BCC28>
+#tasksequencepackageId: TP100003
+#tasksequencedeployid: TP120001
+#sccmId = 6F6BCC28
+param($computerName = 'SERVER1', $collectionName ='UPDATE NOW - Servers', $SiteServer = 'cm02.corp.cmlab.com', $AdvertisementID='TP120001', $Schedule = "TP120001-TP100003-6F6BCC28",$siteCode = 'TP1' , $username = '', $password ='', $logfile = "$(Get-Date -Format 'yyyyMMddHHmmss')")
 $pass = $Password | convertto-securestring -AsPlainText -force;
 $credentials = new-object -typename system.management.automation.pscredential -argumentlist $username, $pass;
 $timespan = New-TimeSpan
 $sleepSeconds = 15
 Start-Transcript -Path "c:\temp\$computername-CallTaskSequence-$logfile.log"
-
+#create a log to read during execution
+#region import modules
 if ($MyInvocation.MyCommand.Path)
 {
     $scriptpath = $MyInvocation.MyCommand.Path
@@ -31,6 +36,8 @@ if((Get-PSDrive -Name $SiteCode -PSProvider CMSite -ErrorAction SilentlyContinue
 }
 $id = 0
 Push-Location
+#endregion
+#region Move to collection
 do
 {
     $SMSID = Get-IniContent -FilePath "\\$computername\c`$\windows\SMSCFG.ini"
@@ -40,7 +47,7 @@ do
 
 Write-Output "Actual smsguid $computerName`: $smsid"
 Pop-Location
-
+#endregion
 Push-Location
 #region SITEDRIVE
 Set-Location "$siteCode`:" -ErrorAction Ignore
@@ -58,9 +65,11 @@ $cmDevices = get-cmDevice -name $computerName |Where-Object{$_.smsid -ne $SMSID}
         }
 
     } 
-    
+#endregion
+
 #check log for id clientIDManagerstartup.log
 #with a status of approval status 1
+#region test for install and id
 $resourceCounter = 40
 while([string]::IsNullOrEmpty($cmDevice) -and ($count -ne $resourceCounter))
 {
@@ -81,12 +90,15 @@ if($count -eq 5)
 {
     throw 'Cannot Get Resource ID'
 }
+#endregion
 #region AddToCollection
 if(!(Get-CMDeviceCollectionDirectMembershipRule -CollectionId $collectionId -ResourceId $resourceId -ErrorAction Ignore))
 {
     Add-CMDeviceCollectionDirectMembershipRule -CollectionId $collectionId -ResourceId $resourceId 
 }
-$pendingupdates =  Get-CMClientPendingUpdates -ComputerName $computerName -credential $credentials
+#endregion
+#region trigger schedules
+$pendingupdates =  Get-CMClientPendingUpdates -ComputerName $computerName 
 $SmsClient =[wmiclass]("\\$ComputerName\ROOT\ccm:SMS_Client")
 $Sccmhash = New-CMSccmTriggerHashTable
 if($credentials)
@@ -125,9 +137,11 @@ while(!(get-wmiobject -computername $ComputerName -query "SELECT * FROM CCM_Soft
     }
 }
 $pendingupdates = $true
+#endregion
 
 $success = $false
 new-psdrive -root "\\$computername\c$\windows\ccm\logs" -name log -PSProvider FileSystem -Credential $credentials
+#region push updates
 while($pendingupdates) # if there is no items in this list assume that the task sequence has not but executed yet.
 {
     $startTaskSeq = invoke-command -ComputerName $computername -scriptblock {get-date} -Credential $credentials
@@ -146,7 +160,7 @@ while($pendingupdates) # if there is no items in this list assume that the task 
         if((test-path "log:\SMSTSLog" -PathType Container -ErrorAction Ignore) -and $Ping )
         {
             Write-Output "Task running found initial log on $computername"
-            $smstslog = Get-CCMSpecificLog -ComputerName $computerName -path 'c:\windows\ccm\logs\smstslog' -log smsts -credential $credentials
+            $smstslog = Get-CCMSpecificLog -ComputerName $computerName -path 'c:\windows\ccm\logs\smstslog' -log smsts #-credential $credentials
                 if($smstslog.smstslog |Where-Object{$_.message -like $validationString} )
                 {
                 $t = Test-CMTaskSequenceComplete -SiteServer $SiteServer -SiteCode $siteCode -ComputerName $computerName -PastHours 1 -credential $credentials
@@ -160,7 +174,7 @@ while($pendingupdates) # if there is no items in this list assume that the task 
         elseif(($ping) -and (test-path  "log:\smsts.log"  -PathType Leaf))
         {
             Write-Output "Task running file merged to logs directory on $computername"
-            $smstslog = Get-CCMSpecificLog -ComputerName $computerName -path 'c:\windows\ccm\logs' -log smsts -credential $credentials
+            $smstslog = Get-CCMSpecificLog -ComputerName $computerName -path 'c:\windows\ccm\logs' -log smsts # -credential $credentials
             if($smstslog.smstslog |Where-Object{$_.message -like $validationString} )
             {
                 write-output "found $validationstring in SMSTS.log file on $computername"
@@ -190,7 +204,7 @@ if($success)
 }
 
 get-psdrive -Name log   | Remove-PSDrive
-#end region
+#endregion
 Pop-Location
 get-psdrive -name $siteCode | remove-psdrive 
 Stop-Transcript
