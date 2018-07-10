@@ -1,4 +1,4 @@
-﻿param($computerName ='DC01', $username ='Administrator', $password ='P@ssw0rd',[ValidateSet("Prod", "Dev")]$environment = 'Dev')
+param($computerName ='SERVER1', $username ='', $password ='',[ValidateSet("Prod", "Dev")]$environment = 'Dev')
 $scriptblock = @'
 param($credential,$smsClientLocation)
 $sccmsetuplog = 'C:\windows\ccmsetup\logs\ccmsetup.log'
