@@ -4,7 +4,7 @@ param(
     $smsClientInstall = "$env:TEMP\SMS_ClientInstall",
     $scriptLog = "$smsClientInstall\install-log.txt"    
     ) #dev SMSMP=cm02.corp.cmlab.com SMSSITECODE=TP1 
-
+#region functions
 function New-SCCMSetupObject
 {
     param($log)
@@ -87,7 +87,8 @@ function Get-SCCMClientVersion
 {
     (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\sms\Mobile Client' -name productversion -ErrorAction Ignore).productversion
 }
-
+#endregion
+#region StartTime
 $scriptLog = $scriptLog.insert($scriptLog.indexOf('.'),"$(get-date -f 'MMddhhmmssyyy')") ;
 new-item $scriptLog -ItemType file -Force
 $sccmRegKey ='HKLM:\software\Microsoft\ccm'
@@ -107,15 +108,19 @@ else
     Write-Output "No SCCM Agent key found: $sccmRegKey"  | Tee-Object -FilePath $scriptLog -Append;
 }
 $installStart = Get-Date ;
+#endregion
+#region install Client
 $sccmsetuplog | Tee-Object -FilePath $scriptLog -Append ;
 $smsSiteString | Tee-Object -FilePath $scriptLog -Append ;
 $smsClientInstall | Tee-Object -FilePath $scriptLog -Append ;
 $x = Install-SCCMAgent -smsClientInstall "$smsClientInstall\client" -smsSiteString $smsSiteString | Tee-Object -FilePath $scriptLog -Append ;
+#endregion
+#region Install complete?
 $y = 0;
 do 
 {
-    $obj = New-SCCMSetupObject -log $sccmsetuplog 
-    if(($obj | Where-Object{$_.status -like '*CcmSetup is exiting with return code 0*'} | ?{$_.time -gt $installStart}).time -gt $installStart)
+    $obj = New-SCCMSetupObject -log $sccmsetuplog #create an object that contains the setup log
+    if(($obj | Where-Object{$_.status -like '*CcmSetup is exiting with return code 0*'} | Where-Object{$_.time -gt $installStart}).time -gt $installStart) #look for install complete
     {
         #"Install status: $successSccm" | Tee-Object -FilePath $scriptLog -Append ;
         $installEnd = ($obj | Where-Object{$_.status -like '*CcmSetup is exiting with return code 0*'} | Where-Object {$_.time -gt $installStart});
@@ -126,9 +131,9 @@ do
             Write-Output "SCCM Client installed successfully $($successSccm.time)" | Tee-Object -FilePath $scriptLog -Append;
         }
     
-    elseif(($obj | ?{$_.status -like '*CcmSetup failed with error code*'} | ?{$_.time -gt $installStart}) )
+    elseif(($obj | Where-Object{$_.status -like '*CcmSetup failed with error code*'} | where-object{$_.time -gt $installStart}) )
     { #only run the install again if the install is not successful and we haven't run more than 3 times
-        $ErrorLog = ($obj | ?{$_.status -like '*CcmSetup failed with error code*'} | ?{$_.time -gt $installStart});
+        $ErrorLog = ($obj | ?{$_.status -like '*CcmSetup failed with error code*'} |where-object{$_.time -gt $installStart});
         If(test-path $sccmRegKey)
         {
             Write-Output "ERRROR with Install - removing SCCM Client -- SCCM Error $($ErrorLog.Status)"| Tee-Object -FilePath $scriptLog -Append ;
@@ -149,4 +154,6 @@ do
     }
 
 }
+
 while(!($installTime -gt 0))
+#endregion
