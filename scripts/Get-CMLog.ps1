@@ -71,7 +71,7 @@ http://blog.richprescott.com
             ForEach($l in $lines )
             {
                  
-                    if($l -match '\<\!\[LOG\[(?<Message>.*)?\]LOG\]\!\>\<time=\"(?<Time>.+)(?<TZAdjust>[+|-])(?<TZOffset>\d{2,3})\"\s+date=\"(?<Date>.+)?\"\s+component=\"(?<Component>.+)?\"\s+context="(?<Context>.*)?\"\s+type=\"(?<Type>\d)?\"\s+thread=\"(?<TID>\d+)?\"\s+file=\"(?<Reference>.+)?\"\>' )
+                    if($l -match '\<\!\[LOG\[(?<Message>.*[\w\W]*)?\]LOG\]\!\>\<time=\"(?<Time>.+)(?<TZAdjust>[+|-])(?<TZOffset>\d{2,3})\"\s+date=\"(?<Date>.+)?\"\s+component=\"(?<Component>.+)?\"\s+context="(?<Context>.*)?\"\s+type=\"(?<Type>\d)?\"\s+thread=\"(?<TID>\d+)?\"\s+file=\"(?<Reference>.+)?\"\>' )
                     {
                         #$UTCTime = [datetime]::ParseExact($("$($matches.date) $($matches.time)$($matches.TZAdjust)$($matches.TZOffset/60)"),"MM-dd-yyyy HH:mm:ss.fffz", $null, "AdjustToUniversal")
                         $LocalTime = [datetime]::ParseExact($("$($matches.date) $($matches.time)"),"MM-dd-yyyy HH:mm:ss.fff", $null)
@@ -106,7 +106,18 @@ http://blog.richprescott.com
                       $message = ($matches['message'] -replace '{' ,'').Replace( "`n",' ')
                       $payload -match '{(?<w>[\w\W]*)}'  | Out-Null
                       $hash = New-Object hashtable
-                      ($matches['w'] -split ';').replace('"','') | %{ ConvertFrom-StringData $_} | %{ $hash.add( "$($_.keys)" , "$($_.values)")}
+                      $m = ($matches['w'] -split ';').replace('"','') 
+                      
+                       $m|foreach{
+                          if($_.contains('\'))
+                            { 
+                                $h = $_.replace("`t",'').replace(' ','')
+                                ConvertFrom-StringData ([regex]::Escape($h))
+                            }
+                            else
+                             { ConvertFrom-StringData $_ }
+
+                      } | foreach{ $hash.add( "$($_.keys)" , "$($_.values)")}
                       
                       $dateTime =$hash['DateTime'] #.Substring(0,$hash['DateTime'].Length-4)
                       $UTCTime = ([datetime]::ParseExact($dateTime,"yyyyMMddHHmmss.ffffffzz\0",$null)).ToUniversalTime()
@@ -125,9 +136,7 @@ http://blog.richprescott.com
                             Reference = $matches.reference
                             Message = $message
                          }
-                      
                     }
-
                 ++$J
             }
         }
